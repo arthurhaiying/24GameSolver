@@ -1,137 +1,165 @@
+
 # include<iostream>
-# include<vector>
 # include<string>
+# include<vector>
+
+// implementation of a 24 game solver using depth first search
+// given four cards, determine whether a solution exists and return the solution
 
 using namespace std;
 
-// The input array contains four numbers, and we want to check if they can be combined to get 24
-bool judge24(vector<int>& nums)
+struct card  // the definition of a card, a value and how this value is obtained
 {
-	return try_pattern_one(nums) || try_pattern_two(nums);
-}
-
-
-vector<double> try_pair(double x, double y, string operators = "+-*/")
-{
-	vector<double> res;
-	for (int i = 0; i < operators.size(); ++i)
-	{
-		char op = operators[i];
-		if (op == '+')                    res.push_back(x + y);
-		else if (op == '-')	              { res.push_back(x - y);  res.push_back(y - x); }
-		// be careful that subtraction and division do not commute, so we need to consider two orders
-		else if (op == '*')               res.push_back(x * y);
-		else if (op == '/' && x*y != 0)   { res.push_back(x / y);  res.push_back(y / x); }
-	}
-	return res;
-}
-
-
-// helper function to check if two doubles can be considered equal in this case
-bool compareDouble(double x, double y);
-
-
-bool try_two_pairs(int x1, int y1, int x2, int y2)
-{
-	vector<double> out_one = try_pair(x1, y1, "+-");
-	vector<double> out_two = try_pair(x2, y2, "+-");
-
-	for (int i = 0; i < out_one.size(); ++i)
-		for (int j = 0; j < out_two.size(); ++j)
-		{
-			vector<double> temp = try_pair(out_one[i], out_two[j], "*/");
-			for (int k = 0; k < temp.size(); ++k)
-				if (compareDouble(temp[k], 24))
-					return true;
-		}
-	return false;
-}
-
-bool try_pattern_two(vector<int>& nums)
-{
-	return (try_two_pairs(nums[0], nums[1], nums[2], nums[3]) ||
-			try_two_pairs(nums[0], nums[2], nums[1], nums[3]) ||
-			try_two_pairs(nums[0], nums[3], nums[1], nums[2]));
-		
-}
-
-struct order
-{
-	int a;
-	int b;
-	int c;
-	int d;
+	double val;
+	string msg;
 };
 
-bool try_associative(int a, int b, int c, int d);
+// a recurrent solve24 function that uses the remained numbers and the result from previous operation 
 
-bool try_pattern_one(vector<int>& nums)
+bool Solve24_rec(vector<card>& nums, string& solution);
+
+// the nums array contain four numbers from 1 to 9, 
+// check if you can do arithmetic operations +, -, *, /, on these numbers and get twenty-four
+bool Solve24(vector<int>& nums, string& solution)
 {
-	const vector<order> perm = { {1, 2, 3, 4}, {1, 2, 4, 3}, {1, 3, 2, 4}, {1, 3, 4, 2}, {1, 4, 2, 3}, {1, 4, 3, 2},
-								 {2, 3, 1, 4}, {2, 3, 4, 1}, {2, 4, 1, 3}, {2, 4, 3, 1}, {3, 4, 1, 2}, {3, 4, 2, 1} };
+	vector<card> input;
+	for (int i = 0; i < nums.size(); ++i)
+		input.push_back({ (double) nums[i], to_string(nums[i]) });
 
-	for (auto it = perm.begin(); it != perm.end(); ++it)
-	{	
-		order curr = *it;
-		if (try_associative(nums[curr.a - 1], nums[curr.b - 1], nums[curr.c - 1], nums[curr.d - 1]))
+	return Solve24_rec(input, solution);
+}
+
+
+// helper function to check if a string contains some char
+bool hasChar(string s, char c)
+{
+	for (int i = 0; i < s.size(); ++i)
+		if (s[i] == c)
 			return true;
-	}
 	return false;
+}
+
+// helper function to check if a string contains a certain char not enclosed by parenthesis
+bool has_unbound_operator(string msg, string op)
+{
+	string s;
+	for (int i = 0; i < msg.size(); ++i)
+		if (!(isdigit(msg[i]) || msg[i] == ' '))
+			s += msg[i];
+	
+	bool res = false;
+	for (int j = 0; j < op.size(); ++j)
+		for (int k = 0; k < s.size(); ++k)
+			if (s[k] == '(')
+				k += 2;
+			else if (s[k] == op[j])
+				res = true;
+	return res;
 
 }
 
 
-bool try_associative(int a, int b, int c, int d)
-{	
-	vector<double> out_one, out_two;
-	out_one = try_pair(a, b);
-	for (int i = 0; i < out_one.size(); ++i)
+string update_message(string lhs, string rhs, char op)
+{
+	if (op == '+')
+		return lhs + ' ' + op + ' ' + rhs;
+	else if (op == '-')
 	{
-		vector<double> temp = try_pair(out_one[i], c);
-		out_two.insert(out_two.end(), temp.begin(), temp.end());
+		// if the right operand contains an unbounded minus sign
+		if (has_unbound_operator(rhs, "-"))
+			rhs = '(' + rhs + ')';
+		return lhs + ' ' + op + ' ' + rhs;
 	}
-	// cerr << out_two[31] << out_two[32] << out_two[33];
+	else if (op == '*')
+	{
+		if (has_unbound_operator(lhs, "+-"))
+			lhs = '(' + lhs + ')';
+		// need to add paranthensis if there is unbound plus or minus sign
+		if (has_unbound_operator(rhs, "+-"))
+			rhs = '(' + rhs + ')';
+		// need to add paranthesis if there is unbound plus or minus sign
+		return lhs + ' ' + op + ' ' + rhs;
+	}
 
-	for (int j = 0; j < out_two.size(); ++j)
+	else if (op == '/')
 	{
-		vector<double> temp = try_pair(out_two[j], d);
-		for (int k = 0; k < temp.size(); ++k)
-			if (compareDouble(temp[k], 24))
-				return true;
+		if (has_unbound_operator(lhs, "+-"))
+			lhs = '(' + lhs + ')';
+		if (has_unbound_operator(rhs, "+-/"))
+			rhs = '(' + rhs + ')';
+		return lhs + ' ' + op + ' ' + rhs;
 	}
-	return false;
+	else
+		cerr << "There is invalid operation" << endl;
 }
 
+
+// check if two doubles can be considered equal in this problem
 bool compareDouble(double x, double y)
 {
-	double diff = x - y;
+	int diff = x - y;
 	return diff < 1e-5 && -diff < 1e-5;
 }
 
-int main()
+// We use a recurrent approach. First, we choose two numbers, try different operations
+// and then check if we can get 24 with the rest numbers and one of the result
+bool Solve24_rec(vector<card>& nums, string& solution)
 {
+	int n = nums.size();
+	if (n == 0)
+		return false;
+	else if (n == 1 && compareDouble(nums[0].val, 24.0))
+	{
+		solution = nums[0].msg; // record how the answer is obtained
+		return true;
+	}
+	else if (n == 1)
+		return false;
 
-	/*
-	vector<int> test1 = {4, 1, 8, 7};
-	vector<int> test2 = {1, 2, 3, 3};
-	vector<int> test3 = { 1, 1, 1, 8 };
-	vector<int> test4 = { 1, 1, 2, 6 };
-	vector<int> test5 = {1, 2, 1, 7};
-	cout << try_pattern_two(test1);
-	cout << try_pattern_two(test2) << endl;
-	cout << try_pattern_one(test3);
-	cout << try_pattern_one(test4);
-	cout << try_pattern_one(test5);
-	cout << try_pattern_two(test5) << endl;
-	*/
-	
-	cout << "the test for numbers 3, 3, 8, 8" << endl;;
-	vector<int> test6 = { 3, 3, 8, 8 };
-	cout << try_associative(3, 8, 3, 8) << endl;
+	for (int i = 0; i < n; ++i)
+		for (int j = i + 1; j < n; ++j)
+		{
+			card left = nums[i];
+			card right = nums[j];
 
-	cout << "The test for numbers 1, 1, 7, 7" << endl;
-	vector<int> test7 = { 1, 1, 7, 7 };
-	cout << try_pattern_one(test7) << endl;
-	
+			vector<card> nums_rest;
+			for (int k = 0; k < n; ++k)
+				if (k != i && k != j)
+					nums_rest.push_back(nums[k]);
+
+			for (int k = 0; k < 6; ++k)
+			{
+				// try all possible six operations with the two numbers
+				// notice that left - right and right - left, left / right and right / left are different operations
+				vector<card> temp = nums_rest;
+				if (k == 0) temp.push_back({ left.val + right.val, update_message(left.msg, right.msg, '+') });
+				else if (k == 1) temp.push_back({ left.val - right.val, update_message(left.msg, right.msg, '-') });
+				else if (k == 2) temp.push_back({ right.val - left.val, update_message(right.msg, left.msg, '-') });
+				else if (k == 3) temp.push_back({ left.val * right.val, update_message(left.msg, right.msg, '*') });
+				else if (k == 4 && right.val != 0) temp.push_back({ left.val / right.val, update_message(left.msg, right.msg, '/') });
+				else if (k == 5 && left.val != 0) temp.push_back({ right.val / left.val, update_message(left.msg, right.msg, '/') });
+
+				if (Solve24_rec(temp, solution))
+					return true;
+			}
+
+		}
+
+	return false;
 }
 
+
+int main()
+{
+	vector<int> test = {2, 1, 3, 8};
+	vector<int> test1 = { 7, 6, 6, 5 };
+	vector<int> test2 = { 1, 2, 3, 7 };
+	vector<int> test3 = { 6, 6, 7, 7 };
+	vector<int> test4 = { 1, 3, 10, 8};
+	
+	string method, method1, method2;
+	bool out = Solve24(test, method);
+	bool out1 = Solve24(test4, method1);
+	cout << "the solution of 2, 1, 3, 8 is: " << out << ' ' << method << endl;
+	cout << "the solution for 4, 4, 1, 3 is: " << out1 << ' ' << method1 << endl;
+}
